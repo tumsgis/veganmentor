@@ -16,11 +16,8 @@ libraryDependencies += "com.sun.mail" % "javax.mail" % "1.6.0"
 
 libraryDependencies += "net.liftweb" %% "lift-json" % "3.2.0-M3"
 
-libraryDependencies += "org.mongodb.scala" %% "mongo-scala-bson" % "2.1.0"
-libraryDependencies += "org.mongodb" % "bson" % "3.6.0"
-libraryDependencies += "org.mongodb" % "mongodb-driver-core" % "3.6.0"
-libraryDependencies += "org.mongodb" % "mongodb-driver-async" % "3.6.0"
-libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.1.0"
+libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.2.0"
 
-
+libraryDependencies += "org.mongodb" %% "casbah" % "3.1.1"
+libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.6.4"
 

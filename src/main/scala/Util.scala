@@ -1,5 +1,6 @@
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZoneId}
 import java.time.format.DateTimeFormatter
+import java.util.Date
 
 object Util {
 
@@ -11,4 +12,10 @@ object Util {
     else formatter
 
   def parseDate(dateInput: String): LocalDateTime = LocalDateTime.parse(dateInput, getDateFormatter(dateInput))
+
+  def toJavaDate(ldt: LocalDateTime): Date =
+    Date.from(ldt.atZone(ZoneId.systemDefault).toInstant)
+
+  def fromJavaDate(javaDate: java.util.Date): LocalDateTime =
+    javaDate.toInstant.atZone(ZoneId.systemDefault).toLocalDateTime
 }

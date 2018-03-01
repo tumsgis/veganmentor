@@ -13,7 +13,8 @@ object JsonMapping {
         ("name" -> mentor.name) ~
         ("note" -> mentor.note) ~
         ("approvedTermsAndConditions" -> mentor.approvedTermsAndConditions) ~
-        ("nrOfAvailableParticipants" -> mentor.nrOfAvailableParticipants) ~
+        ("approvedSlots" -> mentor.approvedSlots) ~
+        ("emptySlots" -> mentor.emptySlots) ~
         ("mentees" ->
           mentor.mentees.map { m =>
             ("timestamp" -> m.timestamp.toString) ~
@@ -40,7 +41,7 @@ object JsonMapping {
               ("name" -> m.name) ~
               ("note" -> m.note) ~
               ("approvedTermsAndConditions" -> m.approvedTermsAndConditions) ~
-              ("nrOfAvailableParticipants" -> m.nrOfAvailableParticipants)
+              ("nrOfAvailableParticipants" -> m.approvedSlots)
           })
     println(prettyRender(json))
   }
