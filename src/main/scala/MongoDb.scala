@@ -54,30 +54,46 @@ object MongoDbRepo {
   def saveParticipant(participant: Participant): Unit = {
     val mongoObj = fromUnpairedParticipant(participant)
     participant match {
-      case Mentor(_, _, _, _, _, _, _, _, mentees) =>
-        MongoFactory("mentor").collection.save(mongoObj, WriteConcern.Safe)
+      case Mentor(_, _, _, _, _, _, _, _, mentees) => saveParticipant(mongoObj, "mentor", participant.email)
         // Add all connected mentors
         mentees.foreach(m => {
           val menteeObj = fromUnpairedParticipant(m, mongoObj._id)
-          MongoFactory("mentee").collection.save(menteeObj, WriteConcern.Safe)
+          saveParticipant(menteeObj, "mentee", m.email)
         })
-      case Mentee(_, _, _, _, _, _, _, _) => MongoFactory("mentee").collection.save(mongoObj, WriteConcern.Safe)
+      case Mentee(_, _, _, _, _, _, _, _) => saveParticipant(mongoObj, "mentee", participant.email)
     }
+  }
+
+  private def saveParticipant(mongoObj: MongoDBObject, collection: String, email: String): Unit =
+    if (!emailAlreadyRegistered(email))
+      MongoFactory(collection).collection.save(mongoObj, WriteConcern.Safe)
+
+  private def emailAlreadyRegistered(email: String): Boolean = {
+    if (getMentorByEmail(email).nonEmpty) {
+      println(s"Mentor with email $email already registered")
+      return true
+    } else if (getMenteeByEmail(email).nonEmpty) {
+      println(s"Mentee with email $email already registered")
+      return true
+    }
+    false
   }
 
   def updateParticipant(participant: Participant): Unit = {
     val mongoObj = fromUnpairedParticipant(participant)
     participant match {
-      case Mentor(id, _, _, _, _, _, _, emptySlots, mentees) =>
-        MongoFactory("mentor").collection.update(MongoDBObject("_id" -> id), $set(("emptySlots", emptySlots - mentees.size)))
+      case Mentor(id, _, _, _, _, _, _, emptySlots, mentees) => updateParticipant("mentor", id, ("emptySlots", emptySlots - mentees.size))
         // Add all connected mentors
         mentees.foreach(m => {
           val menteeObj = fromUnpairedParticipant(m, mongoObj._id)
-          MongoFactory("mentee").collection.update(MongoDBObject("_id" -> m.id), $set(("mentorId", mongoObj._id.get)))
+          updateParticipant("mentee", m.id, ("mentorId", mongoObj._id.get))
         })
       case _ => /* Nothing */
     }
   }
+
+  private def updateParticipant(collection: String, id: Option[Imports.ObjectId], field: (String, Any)): Unit =
+    MongoFactory(collection).collection.update(MongoDBObject("_id" -> id), $set(field))
 
   def toMentor(dbObject: DBObject): Mentor =
     Mentor(
@@ -99,7 +115,7 @@ object MongoDbRepo {
       dbObject.as[String]("name"),
       dbObject.as[String]("note"),
       dbObject.as[Boolean]("approvedTermsAndConditions"),
-      if (dbObject.containsField("mentorId")) dbObject.as[Option[ObjectId]]("mentorId") else None,
+      if (dbObject.containsField("mentorId")) Some(dbObject.as[ObjectId]("mentorId")) else None,
       None
     )
 
@@ -112,17 +128,20 @@ object MongoDbRepo {
   def get(collection: String, query: DBObject): Iterator[Imports.DBObject] =
     for (x <- MongoFactory(collection).collection.find(query)) yield x
 
+  def getOne(collection: String, query: DBObject): Option[Imports.DBObject] =
+    for (x <- MongoFactory(collection).collection.findOne(query)) yield x
+
   def getMentorsWithEmptySlots: List[Mentor] =
     get("mentor", $and("approvedTermsAndConditions" $eq true, "emptySlots" $gt 0)).map(toMentor).toList
 
-  def getMentorByName(name: String): List[Mentor] =
-    get("mentor", "name" $eq name).map(toMentor).toList
+  def getMentorByEmail(email: String): Option[Mentor] =
+    getOne("mentor", "email" $eq email).map(toMentor)
 
   def getMenteesSeekingMentor: List[Mentee] =
     get("mentee", $and("approvedTermsAndConditions" $eq true, "mentorId" $exists false)).map(toMentee).toList
 
-  def getMenteeByName(name: String): List[Mentee] =
-    get("mentee", "name" $eq name).map(toMentee).toList
+  def getMenteeByEmail(email: String): Option[Mentee] =
+    getOne("mentee", "email" $eq email).map(toMentee)
 
   def getMenteesByMentorId(mentorId: ObjectId): List[Mentee] =
     get("mentee", "mentorId" $eq mentorId).map(toMentee).toList

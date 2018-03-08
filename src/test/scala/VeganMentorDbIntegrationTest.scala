@@ -1,51 +1,122 @@
+import java.time.LocalDateTime
+
+import DataStructure.{Mentee, Mentor}
 import junit.framework.TestCase
-import org.junit.{Before, Test}
 import org.junit.Assert._
-import MongoDbRepo._
+import org.junit.{After, Before, Test}
+
 
 class VeganMentorDbIntegrationTest extends TestCase {
 
   @Before
   override def setUp(): Unit = MongoDbRepo.dropAllParticipants()
 
+  @After
+  override def tearDown(): Unit = assertTrue("Some Mentor empty slots are below zero", TestUtil.noEmptySlotsBelowZero)
+
+  private object testData {
+    val timestamp = LocalDateTime.now
+    val email = "test@test.com"
+    val email2 = "test2@test2.com"
+    val name = "name"
+    val note = "note"
+    val approvedTermsAndConditions = true
+    val approvedSlots = 2
+  }
+
   @Test
-  def testRealProcessing(): Unit = {
+  def testSave(): Unit = {
+    import testData._
+
+    val mentor: Mentor = new Mentor(timestamp, email, name, note, approvedTermsAndConditions, approvedSlots)
+    MongoDbRepo.saveParticipant(mentor)
+    MongoDbRepo.getMentorByEmail("test@test.com").foreach(m => {
+      assertNotEquals(None, m.id)
+      assertEquals(timestamp, m.timestamp)
+      assertEquals(email, m.email)
+      assertEquals(name, m.name)
+      assertEquals(note, m.note)
+      assertTrue(approvedTermsAndConditions)
+      assertEquals(approvedSlots, m.approvedSlots)
+      assertEquals(approvedSlots, m.emptySlots)
+    })
+  }
+
+  @Test
+  def testProcessAndUpdate(): Unit = {
+    import testData._
+
+    val mentee: Mentee = new Mentee(timestamp, email, name, note, approvedTermsAndConditions)
+    MongoDbRepo.saveParticipant(mentee)
+    MongoDbRepo.getMenteeByEmail("test@test.com").foreach(m => {
+      assertNotEquals(None, m.id)
+      assertEquals(timestamp, m.timestamp)
+      assertEquals(email, m.email)
+      assertEquals(name, m.name)
+      assertEquals(note, m.note)
+      assertTrue(approvedTermsAndConditions)
+      assertEquals(None, m.mentorId)
+    })
+
+    val mentor: Mentor = new Mentor(timestamp, email2, name, note, approvedTermsAndConditions, approvedSlots)
+    MongoDbRepo.saveParticipant(mentor)
+
+    VeganMentor.process
+
+    val mentorFromDb: Mentor = MongoDbRepo.getMentorByEmail(email2).get
+    assertEquals(approvedSlots, mentorFromDb.approvedSlots)
+    assertEquals(approvedSlots - 1, mentorFromDb.emptySlots)
+
+    val updateMentee: Mentee = Mentee(
+      mentee.id,
+      mentee.timestamp,
+      mentee.email,
+      mentee.name,
+      mentee.note,
+      mentee.approvedTermsAndConditions,
+      mentorFromDb.id)
+    MongoDbRepo.updateParticipant(updateMentee)
+    MongoDbRepo.getMenteeByEmail("test@test.com").foreach(m => {
+      assertNotEquals(None, m.id)
+      assertEquals(timestamp, m.timestamp)
+      assertEquals(email, m.email)
+      assertEquals(name, m.name)
+      assertEquals(note, m.note)
+      assertTrue(approvedTermsAndConditions)
+      assertEquals(mentorFromDb.id, m.mentorId)
+    })
+  }
+
+  @Test
+  def testProcessingTwoFiles(): Unit = {
     val testFile4 = "src/test/files/Vegan_mentor_test_04.csv"
     VeganMentor.saveInputFileToDb(testFile4)
     VeganMentor.process
+    assertEquals(3, MongoDbRepo.getAllMentors.size)
+    assertEquals(5, MongoDbRepo.getAllMentees.size)
+
+    // Process another file
     val testFile5 = "src/test/files/Vegan_mentor_test_05.csv"
     VeganMentor.saveInputFileToDb(testFile5)
     VeganMentor.process
+    assertEquals(3, MongoDbRepo.getAllMentors.size)
+    assertEquals(7, MongoDbRepo.getAllMentees.size)
+    assertEquals(1, MongoDbRepo.getMenteesSeekingMentor.size)
   }
 
-/*  @Test
-  def testProcessing(): Unit = {
+  @Test
+  def testProcessingSameFileTwice(): Unit = {
     val testFile4 = "src/test/files/Vegan_mentor_test_04.csv"
+    VeganMentor.saveInputFileToDb(testFile4)
+    VeganMentor.process
+    assertEquals(3, MongoDbRepo.getAllMentors.size)
+    assertEquals(5, MongoDbRepo.getAllMentees.size)
 
-    val parsedInput = Parser.parseInputFile(testFile4)
-    val sortedInput = VeganMentor.makeSortedQueue(parsedInput._1, parsedInput._2)
-    val pairingResult = VeganMentor.pairParticipants(sortedInput.mentors, sortedInput.mentees)
-
-    // Save all to db
-    // Approved
-    pairingResult.pairedParticipants.mentors.foreach(saveParticipant)
-    pairingResult.pairedParticipants.menteesWaitingList.getOrElse(Seq()).foreach(saveParticipant)
-    // Non approved
-    pairingResult.nonApproved.mentors.foreach(saveParticipant)
-    pairingResult.nonApproved.mentees.foreach(saveParticipant)
-
-    // Fetch mentors from db and map into objects.
-    getAllMentors.foreach(m => {
-      println(m)
-      // Get related mentees from database
-      val mentee = getMenteesByMentorId(m.id.get) // Mentor has been saved to database so we can be sure that the id is set
-      mentee.foreach(println)
-      // Make sure that their count matches with number of related mentees
-      val expectedMenteesCount: Int = m.approvedSlots - m.emptySlots
-      assertEquals(expectedMenteesCount, mentee.size)
-    })
-
-    // Parse another file, relying on data in the database
-    val testFile5 = "src/test/files/Vegan_mentor_test_05.csv"
-  }*/
+    // Process another file
+    val testFile5 = "src/test/files/Vegan_mentor_test_04.csv"
+    VeganMentor.saveInputFileToDb(testFile5)
+    VeganMentor.process
+    assertEquals(3, MongoDbRepo.getAllMentors.size)
+    assertEquals(5, MongoDbRepo.getAllMentees.size)
+  }
 }

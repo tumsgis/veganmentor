@@ -7,6 +7,7 @@ Tasks:
 - [x] Set up email client
 - [x] Set up mongo db
 - [x] Process registrations with CRUD operations in db
-- [ ] Eliminate duplicate emails when registering
-- [ ] Boundary checks participant fields  
+- [x] Eliminate duplicate emails when registering
+- [x] Boundary checks participant fields  
 - [ ] Send emails
+- [ ] Take in account users location

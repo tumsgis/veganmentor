@@ -20,6 +20,12 @@ object VeganMentor {
 
   def pairParticipants(mentors: Seq[Mentor],
                        mentees: Seq[Mentee]): PairingResult = {
+
+    def mentorSlotFull(mentor: Mentor): Boolean =
+      if (mentor.emptySlots == 0) true
+      else if (mentor.approvedSlots == mentor.emptySlots) mentor.mentees.size - mentor.approvedSlots == 0
+      else mentor.mentees.size - mentor.emptySlots == 0
+
     // Iterate through every mentor, assigning to it 1 mentee per iteration.
     // When the mentors iteration is over, another iteration is started, and again, and again
     // until all mentees have been assigned a mentor (if that's possible that is).
@@ -30,12 +36,15 @@ object VeganMentor {
                          menteesIter: Seq[Mentee],
                          mentorsChanged: Seq[Mentor]): PairedParticipants =
       (mentorsIter, menteesIter, mentorsChanged) match {
+        // All mentees have been assigned a mentor
         case (_ , Nil, _) => PairedParticipants(mentorsChanged, None)
-        case (_, _, meChanged) if meChanged.forall(m => m.mentees.lengthCompare(m.approvedSlots) == 0) =>
-          PairedParticipants(meChanged, Some(menteesIter))
+        // All mentor slots are full
+        case (_, _, meChanged) if meChanged.forall(mentorSlotFull) => PairedParticipants(meChanged, Some(menteesIter))
+        // Another iteration through mentors is needed
         case (Nil, _, _) => pairParticiPants(mentorsChanged, menteesIter, mentorsChanged)
-        case (menIter, _, _) if menIter.head.mentees.lengthCompare(menIter.head.approvedSlots) == 0 =>
-          pairParticiPants(menIter.tail, menteesIter, mentorsChanged)
+        // The first mentor in the iteration list has all the slots full
+        case (menIter, _, _) if mentorSlotFull(menIter.head) => pairParticiPants(menIter.tail, menteesIter, mentorsChanged)
+        // Assign mentee to a mentor
         case _ =>  pairParticiPants(
           mentorsIter.tail,
           menteesIter.tail,
